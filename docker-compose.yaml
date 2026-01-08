@@ -1,0 +1,54 @@
+services:
+  # The AI Brain
+  ollama:
+    image: ollama/ollama:latest
+    container_name: teachme-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # For GPU support (optional, usually requires nvidia-container-toolkit)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # The Memory
+  mongodb:
+    image: mongo:7.0
+    container_name: teachme-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=teachme
+    volumes:
+      - mongo_data:/data/db
+
+  # The Orchestrator
+  backend:
+    build: ./backend
+    container_name: teachme-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - MONGO_URI=mongodb://mongodb:27017/teachme
+    depends_on:
+      - ollama
+      - mongodb
+
+  # The Interface
+  frontend:
+    build: ./frontend
+    container_name: teachme-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  ollama_data:
+  mongo_data:

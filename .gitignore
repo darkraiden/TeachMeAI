@@ -1,0 +1,37 @@
+# OS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+docker-compose.override.yml
+
+# Backend (Go)
+backend/main
+backend/*.exe
+backend/*.test
+backend/vendor/
+backend/go.work
+backend/coverage.out
+backend/tmp/
+
+# Frontend (Node)
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.env
+frontend/.env.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/test-results/
+
+# General
+tmp/
+*.log
