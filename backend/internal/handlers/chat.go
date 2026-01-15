@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -41,13 +41,13 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get or create a session
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	// Use a short timeout for initial session retrieval
+	getCtx, getCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer getCancel()
 
-	session, err := h.sessionStore.GetOrCreate(ctx, req.SessionID)
+	session, err := h.sessionStore.GetOrCreate(getCtx, req.SessionID)
 	if err != nil {
-		log.Printf("Session error: %v", err)
+		slog.Error("Session error", "error", err)
 		http.Error(w, "Failed to manage session", http.StatusInternalServerError)
 		return
 	}
@@ -60,10 +60,10 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	session.Messages = append(session.Messages, userMsg)
 
-	// Get AI response
+	// Get AI response (this can take a while, no context timeout here - HTTP client has its own)
 	aiResponse, err := h.ollamaClient.Chat(session.Messages, ollama.DefaultSystemPrompt)
 	if err != nil {
-		log.Printf("Ollama error: %v", err)
+		slog.Error("Ollama error", "error", err)
 		http.Error(w, "Failed to get AI response", http.StatusBadGateway)
 		return
 	}
@@ -76,9 +76,13 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	session.Messages = append(session.Messages, assistantMsg)
 
+	// Use a fresh context for saving (the previous one may have expired during Ollama call)
+	saveCtx, saveCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer saveCancel()
+
 	// Persist to database
-	if err := h.sessionStore.Save(ctx, session); err != nil {
-		log.Printf("Failed to save session: %v", err)
+	if err := h.sessionStore.Save(saveCtx, session); err != nil {
+		slog.Error("Failed to save session", "error", err)
 		// Continue anyway - don't fail the request
 	}
 

@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: "TeachMe Dashboards"
+    orgId: 1
+    folder: "TeachMe"
+    folderUid: "teachme"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

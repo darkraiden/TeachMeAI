@@ -1,5 +1,7 @@
 # 🦁 TeachMe AI
 
+> ⚠️ **Disclaimer**: This project was entirely vibe-coded with AI assistance. While functional, it was built through iterative experimentation rather than rigorous engineering practices. Use at your own discretion and review the code before deploying in any production environment.
+
 **TeachMe AI** is a safe, locally-hosted AI tutor and study buddy designed specifically for children. It acts as a friendly wrapper around powerful Large Language Models (LLMs), ensuring a controlled and educational environment for kids to ask questions, learn new concepts, and explore their curiosity without the risks associated with unmoderated internet access.
 
 ![TeachMe AI Preview](assets/teachme-preview.png)
@@ -29,6 +31,72 @@ This project is built with a modern, performance-oriented stack:
 * **Frontend**: [React](https://react.dev/) + [Vite](https://vitejs.dev/) - Responsive and snappy user interface.
 * **Database**: [MongoDB](https://www.mongodb.com/) - flexible storage for chat logs and sessions.
 * **AI Engine**: [Ollama](https://ollama.com/) - The easiest way to run LLMs locally.
+* **Observability**: Prometheus, Grafana, Elasticsearch, Kibana, and Filebeat for metrics and logs.
+
+## 🔒 Safety Layer
+
+TeachMe AI implements a multi-layered safety system to protect children:
+
+1. **Banned Words Filter**: Incoming requests and outgoing responses are checked against a configurable list of banned words (`backend/banned_words.txt`). Matches are blocked immediately.
+
+2. **LLM Self-Moderation**: The system prompt instructs the AI to refuse harmful topics. When the LLM self-moderates, these responses are detected and logged for auditing.
+
+3. **Request Statuses**:
+
+   | Status        | Description                       |
+   | ------------- | --------------------------------- |
+   | `allowed`     | Request passed all safety checks  |
+   | `blocked`     | Caught by the banned words filter |
+   | `llm-refused` | LLM self-moderated its response   |
+
+All safety events are logged with structured JSON and can be queried in Kibana or visualized in Grafana.
+
+## 📊 Observability Stack
+
+TeachMe AI includes a full observability stack for monitoring, metrics, and log analysis.
+
+### Components
+
+| Service           | Port   | Description                           |
+| ----------------- | ------ | ------------------------------------- |
+| **Prometheus**    | `9090` | Metrics collection and storage        |
+| **Grafana**       | `3001` | Dashboards and visualization          |
+| **Elasticsearch** | `9200` | Log storage and search                |
+| **Kibana**        | `5601` | Log exploration and queries           |
+| **Filebeat**      | -      | Ships container logs to Elasticsearch |
+
+### Starting the Observability Stack
+
+The full stack (including observability) starts with:
+
+```bash
+docker compose up --build
+```
+
+Or start only the observability services:
+
+```bash
+docker compose up prometheus grafana elasticsearch kibana filebeat
+```
+
+### Accessing Dashboards
+
+* **Grafana**: <http://localhost:3001> (login: `admin` / `admin`)
+  * Pre-configured dashboards in `Dashboards → TeachMe` folder
+  * **TeachMe Overview**: Request rates, latency, success rates, status distribution
+  * **TeachMe Safety & Logs**: Log counts, blocked requests, audit trail
+
+* **Kibana**: <http://localhost:5601>
+  * Query logs with: `json.app:"teachme-backend"`
+  * Filter blocked requests: `json.status:"blocked"`
+  * Audit LLM refusals: `json.status:"llm-refused"`
+
+### Metrics Exposed
+
+The backend exposes Prometheus metrics at `/metrics`:
+
+* `teachme_requests_total{status, source}` - Total requests by status and source
+* `teachme_request_duration_seconds` - Request latency histogram
 
 ## 🏁 Getting Started
 

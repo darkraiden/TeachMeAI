@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"teachme/internal/models"
 )
@@ -15,9 +16,47 @@ const (
 	DefaultSystemPrompt = "You are a kind, patient, and safe AI tutor for children. " +
 		"You explain things simply and clearly. " +
 		"If asked about harmful, violent, or adult topics, " +
-		"you must gently refuse and suggest a safer topic. " +
+		"you must refuse by starting your response with: " +
+		"\"I can't help with that.\" followed by a gentle explanation and suggestion for a safer topic. " +
 		"Do not use complicated words."
 )
+
+// LLMRefusalPatterns are phrases that indicate the LLM is self-moderating its response
+var LLMRefusalPatterns = []string{
+	// Direct refusals
+	"i can't help with that",
+	"i cannot help with that",
+	"i'm not able to help",
+	"i am not able to help",
+	"i can't assist with",
+	"i cannot assist with",
+	"i'm unable to",
+	"i am unable to",
+	"i can't provide information",
+	"i cannot provide information",
+	// Topic redirection phrases
+	"this might not be the topic best suited",
+	"not be the topic best suited",
+	"isn't appropriate",
+	"is not appropriate",
+	"isn't safe to explore",
+	"is not safe to explore",
+	"not appropriate or safe",
+	// Safe environment phrases
+	"i want to make sure that our talks are always positive",
+	"make sure we always have a safe environment",
+	"let's keep things light-hearted",
+	"let's talk about something else",
+	"it's best not to think about",
+	"instead of discussing",
+	"how about we learn",
+	"how about learning",
+	// Apology + redirect patterns
+	"i'm sorry, but discussing",
+	"i am sorry, but discussing",
+	"i'm sorry, but i can't",
+	"i am sorry, but i cannot",
+}
 
 // ChatMessage represents a message in the Ollama chat format
 type ChatMessage struct {
@@ -46,7 +85,9 @@ type Client struct {
 func NewClient(baseURL string) *Client {
 	return &Client{
 		baseURL: baseURL,
-		client:  &http.Client{},
+		client: &http.Client{
+			Timeout: 120 * time.Second, // LLM responses can be slow
+		},
 	}
 }
 
