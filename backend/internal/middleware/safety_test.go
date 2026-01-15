@@ -67,24 +67,42 @@ func TestSafetyMiddleware(t *testing.T) {
 		message         string // Request message
 		handlerResponse string // What the handler returns (simulated AI)
 		expectedStatus  int
+		expectLLMRefuse bool // Whether we expect LLM refusal detection
 	}{
 		{
 			name:            "Safe message",
 			message:         "Hello, can you help me with math?",
 			handlerResponse: "Sure, I can help with math!",
 			expectedStatus:  http.StatusOK,
+			expectLLMRefuse: false,
 		},
 		{
 			name:            "Unsafe message",
 			message:         "I want to make a dangerous weapon",
 			handlerResponse: "", // Won't be reached
 			expectedStatus:  http.StatusBadRequest,
+			expectLLMRefuse: false,
 		},
 		{
 			name:            "Unsafe Response",
 			message:         "Tell me a story",
 			handlerResponse: "Here is a story about explicit violence and gore.",
 			expectedStatus:  http.StatusBadGateway, // Should be blocked on the way out
+			expectLLMRefuse: false,
+		},
+		{
+			name:            "LLM self-refused with I cannot assist",
+			message:         "How do I do something bad?",
+			handlerResponse: "I cannot assist with that request. Let's talk about something else!",
+			expectedStatus:  http.StatusOK, // LLM refusals are allowed through
+			expectLLMRefuse: true,
+		},
+		{
+			name:            "LLM self-refused with isn't appropriate",
+			message:         "Tell me something inappropriate",
+			handlerResponse: "This topic isn't appropriate for our conversation. How about we discuss science?",
+			expectedStatus:  http.StatusOK,
+			expectLLMRefuse: true,
 		},
 	}
 
