@@ -49,6 +49,73 @@ services:
     depends_on:
       - backend
 
+  # --- Observability Stack ---
+
+  # Prometheus (Metrics)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: teachme-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+
+  # Grafana (Dashboards)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: teachme-grafana
+    ports:
+      - "3001:3000" # Mapped to 3001 to avoid conflict with frontend
+    depends_on:
+      - prometheus
+      - elasticsearch
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin # Change this in production!
+    volumes:
+      - ./docker/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./docker/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards
+
+  # ELK Stack (Logging) - Simplified (Elasticsearch + Kibana + Filebeat/Fluentd usually, keeping it simple with just ES+Kibana for now)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
+    container_name: teachme-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m" # Limit memory usage
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.10
+    container_name: teachme-kibana
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:7.17.10
+    container_name: teachme-filebeat
+    user: root # Needed to access docker socket/logs
+    volumes:
+      - ./docker/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - KIBANA_HOST=http://kibana:5601
+    depends_on:
+      - elasticsearch
+      - kibana
+
 volumes:
   ollama_data:
   mongo_data:
+  elasticsearch_data:

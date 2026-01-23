@@ -23,7 +23,7 @@ function App() {
 
     useEffect(() => {
         fetchSessions()
-    }, [sessionId]) 
+    }, [sessionId])
 
     const fetchSessions = async () => {
         try {
@@ -49,9 +49,9 @@ function App() {
                     role: m.role === 'assistant' ? 'ai' : m.role,
                     text: m.content
                 })) : []
-                
+
                 if (msgs.length === 0) {
-                     setMessages([{ role: 'ai', text: 'Hi! I am your AI study buddy. Ask me anything!' }])
+                    setMessages([{ role: 'ai', text: 'Hi! I am your AI study buddy. Ask me anything!' }])
                 } else {
                     setMessages(msgs)
                 }
@@ -124,13 +124,20 @@ function App() {
                 payload.session_id = sessionId
             }
 
+            // Set a 2-minute timeout for LLM responses
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 120000)
+
             const response = await fetch('http://localhost:8080/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(payload),
+                signal: controller.signal,
             })
+
+            clearTimeout(timeoutId)
 
             if (!response.ok) {
                 throw new Error('Network response was not ok')
@@ -161,8 +168,8 @@ function App() {
                 </button>
                 <div className="session-list">
                     {sessions.map(session => (
-                        <div 
-                            key={session.id} 
+                        <div
+                            key={session.id}
                             className={`session-item ${session.id === sessionId ? 'active' : ''}`}
                             onClick={() => loadSession(session.id)}
                         >
@@ -175,12 +182,12 @@ function App() {
                                     <button className="icon-btn delete-btn" onClick={(e) => deleteSession(e, session.id)} title="Delete">🗑️</button>
                                 </div>
                             </div>
-                            
+
                             {editingSessionId === session.id ? (
                                 <div className="edit-area" onClick={e => e.stopPropagation()}>
-                                    <input 
-                                        type="text" 
-                                        value={editTitle} 
+                                    <input
+                                        type="text"
+                                        value={editTitle}
                                         onChange={e => setEditTitle(e.target.value)}
                                         className="edit-input"
                                         autoFocus
@@ -189,8 +196,8 @@ function App() {
                                 </div>
                             ) : (
                                 <div className="session-preview">
-                                    {session.title || (session.messages && session.messages.length > 0 
-                                        ? session.messages[session.messages.length - 1].content 
+                                    {session.title || (session.messages && session.messages.length > 0
+                                        ? session.messages[session.messages.length - 1].content
                                         : 'New Conversation')}
                                 </div>
                             )}

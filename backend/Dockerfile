@@ -10,6 +10,7 @@ RUN go build -o main .
 FROM alpine:latest
 WORKDIR /root/
 COPY --from=builder /app/main .
+COPY --from=builder /app/banned_words.txt .
 
 EXPOSE 8080
 CMD ["./main"]

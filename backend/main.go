@@ -3,22 +3,34 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"teachme/internal/config"
 	"teachme/internal/database"
 	"teachme/internal/handlers"
+	"teachme/internal/middleware"
 	"teachme/internal/ollama"
+	"teachme/internal/router"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func main() {
+	// Setup structured logging (JSON) with application name
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("app", "teachme-backend")
+	slog.SetDefault(logger)
+
 	// Load configuration
 	cfg := config.Load()
+
+	// Load banned words
+	if err := middleware.LoadBannedWords("banned_words.txt"); err != nil {
+		slog.Warn("Failed to load banned words", "error", err, "component", "safety")
+	}
 
 	// Connect to MongoDB
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -26,15 +38,17 @@ func main() {
 
 	dbClient, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.MongoURI))
 	if err != nil {
-		log.Fatal("Failed to connect to MongoDB:", err)
+		slog.Error("Failed to connect to MongoDB", "error", err)
+		os.Exit(1)
 	}
 
 	// Verify connection
 	if err := dbClient.Ping(ctx, nil); err != nil {
-		log.Fatal("Failed to ping MongoDB:", err)
+		slog.Error("Failed to ping MongoDB", "error", err)
+		os.Exit(1)
 	}
 
-	log.Printf("Connected to MongoDB at %s", cfg.MongoURI)
+	slog.Info("Connected to MongoDB", "uri", cfg.MongoURI)
 
 	// Initialize dependencies
 	sessionStore := database.NewSessionStore(dbClient, "teachme")
@@ -43,13 +57,13 @@ func main() {
 	sessionHandler := handlers.NewSessionHandler(sessionStore)
 
 	// Setup routes
-	http.Handle("/chat", chatHandler)
-	http.Handle("/sessions", sessionHandler)
+	r := router.NewRouter(chatHandler, sessionHandler)
 
 	// Start server
 	addr := fmt.Sprintf(":%s", cfg.ServerPort)
-	log.Printf("Server starting on port %s... (Ollama Host: %s)", cfg.ServerPort, cfg.OllamaHost)
-	if err := http.ListenAndServe(addr, nil); err != nil {
-		log.Fatal(err)
+	slog.Info("Server starting", "port", cfg.ServerPort, "ollama_host", cfg.OllamaHost)
+	if err := http.ListenAndServe(addr, r); err != nil {
+		slog.Error("Server failed", "error", err)
+		os.Exit(1)
 	}
 }
